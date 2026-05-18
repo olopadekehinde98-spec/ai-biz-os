@@ -1,0 +1,18 @@
+import { Module } from '@nestjs/common';
+import { PassportModule } from '@nestjs/passport';
+import { JwtModule } from '@nestjs/jwt';
+import { AuthController } from './auth.controller';
+import { AuthService } from './auth.service';
+import { JwtStrategy } from './jwt.strategy';
+import { SupabaseProvider } from '../../providers/supabase.provider';
+
+@Module({
+  imports: [
+    PassportModule.register({ defaultStrategy: 'jwt' }),
+    JwtModule.register({ secret: process.env['NEXTAUTH_SECRET'] }),
+  ],
+  controllers: [AuthController],
+  providers: [AuthService, JwtStrategy, SupabaseProvider],
+  exports: [AuthService, JwtStrategy],
+})
+export class AuthModule {}
