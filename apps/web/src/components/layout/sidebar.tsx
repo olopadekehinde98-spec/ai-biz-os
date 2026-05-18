@@ -12,7 +12,8 @@ import { cn } from '@/lib/utils';
 import { useBusinessStore } from '@/store/business';
 import { Badge } from '@/components/ui/badge';
 
-const NAV: { href: string; icon: React.ElementType; label: string; adminOnly?: boolean }[] = [
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const NAV: { href: string; icon: any; label: string; adminOnly?: boolean }[] = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/leads', icon: Users, label: 'Leads' },
   { href: '/support', icon: HeadphonesIcon, label: 'Support' },
