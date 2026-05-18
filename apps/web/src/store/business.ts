@@ -1,6 +1,22 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Business } from '@ai-biz-os/shared';
+
+export interface Business {
+  id: string;
+  user_id: string;
+  name: string;
+  industry: string | null;
+  description: string | null;
+  goals: string[];
+  timezone: string;
+  website_url?: string | null;
+  instagram_url?: string | null;
+  facebook_url?: string | null;
+  twitter_url?: string | null;
+  linkedin_url?: string | null;
+  tiktok_url?: string | null;
+  created_at: string;
+}
 
 interface BusinessStore {
   businesses: Business[];
