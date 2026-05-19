@@ -125,30 +125,53 @@ export default function SocialPage() {
 
     let successCount = 0;
     for (const post of toPost) {
-      const { error } = await supabase.from('content_posts').insert({
+      // Save to DB first
+      const { data: savedPost, error: dbErr } = await supabase.from('content_posts').insert({
         business_id: businessId,
         platform: post.platform,
         content: post.content,
-        status,
+        status: status === 'published' ? 'draft' : status, // will update after publish attempt
         scheduled_at: scheduledAt || null,
         ai_generated: true,
         media_urls: [],
-      });
-      if (!error) successCount++;
+      }).select().single();
+
+      if (dbErr) { toast.error('DB error: ' + dbErr.message); continue; }
+
+      // If publishing now, call the publish API
+      if (status === 'published') {
+        const res = await fetch('/api/social/publish', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            businessId,
+            platform: post.platform,
+            content: post.content,
+            postId: savedPost?.id,
+          }),
+        });
+        const result = await res.json();
+        if (!res.ok) {
+          toast.error(`${post.platform}: ${result.error}`);
+        } else {
+          toast.success(`✅ Posted to ${post.platform}!`);
+          successCount++;
+        }
+      } else {
+        successCount++;
+      }
     }
 
     setSaving(false);
-    if (successCount > 0) {
-      toast.success(`${successCount} post${successCount > 1 ? 's' : ''} ${status === 'published' ? 'published' : status === 'scheduled' ? 'scheduled' : 'saved as draft'}!`);
-      setShowCreate(false);
-      setIdea('');
-      setPreviews({});
-      setSelectedPlatforms(['instagram', 'facebook']);
-      setScheduledAt('');
-      load();
-    } else {
-      toast.error('Failed to save posts. Run the RLS fix SQL in Supabase first.');
+    if (successCount > 0 && status !== 'published') {
+      toast.success(`${successCount} post${successCount > 1 ? 's' : ''} ${status === 'scheduled' ? 'scheduled' : 'saved as draft'}!`);
     }
+    setShowCreate(false);
+    setIdea('');
+    setPreviews({});
+    setSelectedPlatforms(['instagram', 'facebook']);
+    setScheduledAt('');
+    load();
   }
 
   async function handleDelete(id: string) {
