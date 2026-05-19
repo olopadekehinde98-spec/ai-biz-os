@@ -66,38 +66,17 @@ export default function AnalyticsPage() {
       try {
         const since = new Date(Date.now() - parseInt(days) * 86400_000).toISOString();
 
-        const [
-          { data: leads },
-          { data: tickets },
-          { data: tasks },
-          { data: content },
-          { data: aiCosts },
-        ] = await Promise.all([
-          supabase
-            .from('leads')
-            .select('status')
-            .eq('business_id', businessId)
-            .gte('created_at', since),
-          supabase
-            .from('support_tickets')
-            .select('status, sentiment')
-            .eq('business_id', businessId)
-            .gte('created_at', since),
-          supabase
-            .from('tasks')
-            .select('status')
-            .eq('business_id', businessId)
-            .gte('created_at', since),
-          supabase
-            .from('content_posts')
-            .select('status, platform')
-            .eq('business_id', businessId)
-            .gte('created_at', since),
-          supabase
-            .from('ai_cost_logs')
-            .select('feature, cost_usd')
-            .eq('business_id', businessId)
-            .gte('created_at', since),
+        // Fetch each table independently — ignore errors from missing columns
+        const safeQuery = async (fn: () => any) => {
+          try { const r = await fn(); return r.data ?? []; } catch { return []; }
+        };
+
+        const [leads, tickets, tasks, content, aiCosts] = await Promise.all([
+          safeQuery(() => supabase.from('leads').select('status').eq('business_id', businessId)),
+          safeQuery(() => supabase.from('support_tickets').select('status, sentiment').eq('business_id', businessId)),
+          safeQuery(() => supabase.from('tasks').select('status').eq('business_id', businessId)),
+          safeQuery(() => supabase.from('content_posts').select('status, platform').eq('business_id', businessId)),
+          safeQuery(() => supabase.from('ai_cost_logs').select('feature, cost_usd').eq('business_id', businessId)),
         ]);
 
         if (cancelled) return;

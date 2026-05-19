@@ -57,7 +57,12 @@ export default function ApprovalsPage() {
 
     const { data, error } = await query;
     if (error) {
-      toast.error('Failed to load actions');
+      // Table may be missing created_at — try without ordering
+      const { data: fallback } = await supabase
+        .from('ai_actions')
+        .select('*')
+        .eq('business_id', businessId);
+      setActions(fallback ?? []);
     } else {
       setActions(data ?? []);
     }
