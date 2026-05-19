@@ -83,12 +83,12 @@ export default function AnalyticsPage() {
 
         // Leads
         const totalLeads = leads?.length ?? 0;
-        const convertedLeads = leads?.filter((l) => l.status === 'converted').length ?? 0;
+        const convertedLeads = leads?.filter((l: any) => l.status === 'converted').length ?? 0;
         const conversionRate = totalLeads > 0 ? ((convertedLeads / totalLeads) * 100).toFixed(1) : '0';
 
         // Lead funnel — group by status
         const leadStatusMap: Record<string, number> = {};
-        for (const l of leads ?? []) {
+        for (const l of leads ?? [] as any[]) {
           leadStatusMap[l.status] = (leadStatusMap[l.status] ?? 0) + 1;
         }
         const leadFunnel: LeadFunnelRow[] = Object.entries(leadStatusMap).map(([status, count]) => ({
@@ -98,23 +98,23 @@ export default function AnalyticsPage() {
 
         // Tickets
         const totalTickets = tickets?.length ?? 0;
-        const resolvedTickets = tickets?.filter((t) => t.status === 'resolved').length ?? 0;
-        const escalatedTickets = tickets?.filter((t) => t.status === 'escalated').length ?? 0;
+        const resolvedTickets = tickets?.filter((t: any) => t.status === 'resolved').length ?? 0;
+        const escalatedTickets = tickets?.filter((t: any) => t.status === 'escalated').length ?? 0;
         const resolutionRate = totalTickets > 0 ? ((resolvedTickets / totalTickets) * 100).toFixed(1) : '0';
 
         // Tasks
         const totalTasks = tasks?.length ?? 0;
-        const completedTasks = tasks?.filter((t) => t.status === 'completed').length ?? 0;
-        const pendingTasks = tasks?.filter((t) => t.status === 'pending').length ?? 0;
+        const completedTasks = tasks?.filter((t: any) => t.status === 'done').length ?? 0;
+        const pendingTasks = tasks?.filter((t: any) => t.status === 'todo').length ?? 0;
 
         // Content
         const totalContent = content?.length ?? 0;
-        const publishedContent = content?.filter((c) => c.status === 'published').length ?? 0;
+        const publishedContent = content?.filter((c: any) => c.status === 'published').length ?? 0;
 
         // AI cost
         let totalCost = 0;
         const byFeature: Record<string, { calls: number; cost_usd: number }> = {};
-        for (const row of aiCosts ?? []) {
+        for (const row of aiCosts ?? [] as any[]) {
           totalCost += row.cost_usd ?? 0;
           const feat = row.feature ?? 'unknown';
           if (!byFeature[feat]) byFeature[feat] = { calls: 0, cost_usd: 0 };
