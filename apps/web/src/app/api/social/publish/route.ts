@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { businessId, platform, content, postId } = await req.json();
+    const { businessId, platform, content, postId, videoUrl } = await req.json();
 
     // Get the stored access token for this platform
     const { data: account } = await supabase
@@ -42,26 +42,94 @@ export async function POST(req: NextRequest) {
     let success = false;
 
     if (platform === 'facebook') {
-      // Post to Facebook Page
-      const res = await fetch(
-        `https://graph.facebook.com/v19.0/${account.account_name}/feed`,
+      if (videoUrl) {
+        // Post video to Facebook Page
+        const res = await fetch(
+          `https://graph.facebook.com/v19.0/${account.account_name}/videos`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              file_url: videoUrl,
+              description: content,
+              access_token: account.access_token,
+            }),
+          }
+        );
+        publishResult = await res.json();
+        success = !!publishResult.id && !publishResult.error;
+      } else {
+        // Post text to Facebook Page
+        const res = await fetch(
+          `https://graph.facebook.com/v19.0/${account.account_name}/feed`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message: content,
+              access_token: account.access_token,
+            }),
+          }
+        );
+        publishResult = await res.json();
+        success = !!publishResult.id && !publishResult.error;
+      }
+    }
+
+    if (platform === 'instagram') {
+      if (!videoUrl) {
+        return NextResponse.json({ error: 'Instagram posting requires a video or image URL. Switch to Video Post and add a URL.' }, { status: 400 });
+      }
+      // Instagram video: create media container then publish
+      const pageId = account.account_name;
+      const token = account.access_token;
+
+      // Step 1: Get Instagram Business Account ID
+      const igAccountRes = await fetch(
+        `https://graph.facebook.com/v19.0/${pageId}?fields=instagram_business_account&access_token=${token}`
+      );
+      const igAccountData = await igAccountRes.json();
+      const igId = igAccountData?.instagram_business_account?.id;
+
+      if (!igId) {
+        return NextResponse.json({ error: 'No Instagram Business account linked to this Facebook Page. Link it in Meta Business Suite.' }, { status: 400 });
+      }
+
+      // Step 2: Create media container
+      const containerRes = await fetch(
+        `https://graph.facebook.com/v19.0/${igId}/media`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            message: content,
-            access_token: account.access_token,
+            video_url: videoUrl,
+            caption: content,
+            media_type: 'REELS',
+            access_token: token,
           }),
         }
       );
-      publishResult = await res.json();
-      success = !!publishResult.id && !publishResult.error;
-    }
+      const container = await containerRes.json();
+      if (!container.id) {
+        return NextResponse.json({ error: container.error?.message || 'Failed to create Instagram media container' }, { status: 400 });
+      }
 
-    if (platform === 'instagram') {
-      // Instagram requires a media container first (for images)
-      // Text-only posts need image_url — for now we post as Facebook story
-      return NextResponse.json({ error: 'Instagram posting requires an image. Please add an image URL to your post.' }, { status: 400 });
+      // Step 3: Wait a moment then publish
+      await new Promise(r => setTimeout(r, 5000));
+
+      const publishRes = await fetch(
+        `https://graph.facebook.com/v19.0/${igId}/media_publish`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            creation_id: container.id,
+            access_token: token,
+          }),
+        }
+      );
+      publishResult = await publishRes.json();
+      success = !!publishResult.id && !publishResult.error;
     }
 
     if (platform === 'twitter') {
@@ -76,6 +144,31 @@ export async function POST(req: NextRequest) {
       });
       publishResult = await res.json();
       success = !!publishResult.data?.id;
+    }
+
+    if (platform === 'linkedin') {
+      // LinkedIn Share API
+      const res = await fetch('https://api.linkedin.com/v2/ugcPosts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${account.access_token}`,
+          'X-Restli-Protocol-Version': '2.0.0',
+        },
+        body: JSON.stringify({
+          author: `urn:li:person:${account.account_name}`,
+          lifecycleState: 'PUBLISHED',
+          specificContent: {
+            'com.linkedin.ugc.ShareContent': {
+              shareCommentary: { text: content },
+              shareMediaCategory: 'NONE',
+            },
+          },
+          visibility: { 'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC' },
+        }),
+      });
+      publishResult = await res.json();
+      success = !!publishResult.id && !publishResult.status;
     }
 
     // Update post status in DB

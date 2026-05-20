@@ -77,6 +77,8 @@ export default function SocialPage() {
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(['instagram', 'facebook']);
   const [previews, setPreviews] = useState<Record<string, string>>({});
   const [scheduledAt, setScheduledAt] = useState('');
+  const [videoUrl, setVideoUrl] = useState('');
+  const [postType, setPostType] = useState<'text' | 'video'>('text');
 
   const load = useCallback(async () => {
     if (!businessId) return;
@@ -148,6 +150,7 @@ export default function SocialPage() {
             platform: post.platform,
             content: post.content,
             postId: savedPost?.id,
+            videoUrl: postType === 'video' ? videoUrl : undefined,
           }),
         });
         const result = await res.json();
@@ -171,6 +174,8 @@ export default function SocialPage() {
     setPreviews({});
     setSelectedPlatforms(['instagram', 'facebook']);
     setScheduledAt('');
+    setVideoUrl('');
+    setPostType('text');
     load();
   }
 
@@ -293,6 +298,39 @@ export default function SocialPage() {
                 className="resize-none"
               />
             </div>
+
+            {/* Post type toggle */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPostType('text')}
+                className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                  postType === 'text' ? 'border-primary bg-primary/10 text-primary' : 'border-muted-foreground/30 text-muted-foreground'
+                }`}>
+                📝 Text Post
+              </button>
+              <button
+                onClick={() => setPostType('video')}
+                className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                  postType === 'video' ? 'border-primary bg-primary/10 text-primary' : 'border-muted-foreground/30 text-muted-foreground'
+                }`}>
+                🎥 Video Post
+              </button>
+            </div>
+
+            {/* Video URL input */}
+            {postType === 'video' && (
+              <div className="space-y-1.5 rounded-lg border border-primary/20 bg-primary/5 p-3">
+                <Label className="text-sm font-semibold">🎥 Video URL</Label>
+                <Input
+                  placeholder="https://example.com/your-video.mp4"
+                  value={videoUrl}
+                  onChange={e => setVideoUrl(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Paste a direct link to your video file (.mp4, .mov). You can upload to Google Drive, Dropbox, or any public link.
+                </p>
+              </div>
+            )}
 
             {/* Step 2: Platforms */}
             <div className="space-y-2">
