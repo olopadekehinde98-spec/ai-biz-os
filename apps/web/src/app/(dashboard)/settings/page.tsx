@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Building2, Plus, Save, Globe, Instagram, Facebook, Twitter, Linkedin, Link2, CheckCircle2, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Header } from '@/components/layout/header';
@@ -43,6 +44,7 @@ const SOCIAL_PLATFORMS = [
 
 export default function SettingsPage() {
   const { activeBusiness, setBusinesses, setActiveBusiness } = useBusinessStore();
+  const searchParams = useSearchParams();
   const [showCreate, setShowCreate] = useState(false);
   const [saving, setSaving] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -54,6 +56,26 @@ export default function SettingsPage() {
   const [platformToken, setPlatformToken] = useState('');
   const [platformAccountName, setPlatformAccountName] = useState('');
   const [savingPlatform, setSavingPlatform] = useState(false);
+
+  // Handle Facebook OAuth callback result
+  useEffect(() => {
+    const fbSuccess = searchParams.get('fb_success');
+    const fbError = searchParams.get('fb_error');
+    const pageName = searchParams.get('page_name');
+    if (fbSuccess) {
+      toast.success(`✅ Facebook connected! Page: ${pageName ?? 'Your Page'}`);
+      window.history.replaceState({}, '', '/settings');
+    }
+    if (fbError) {
+      const messages: Record<string, string> = {
+        no_pages: 'No Facebook Pages found. Create a Facebook Page first.',
+        token_exchange_failed: 'Facebook login failed. Please try again.',
+        missing_code: 'Facebook login cancelled.',
+      };
+      toast.error(messages[fbError] ?? `Facebook error: ${fbError}`);
+      window.history.replaceState({}, '', '/settings');
+    }
+  }, [searchParams]);
 
   // Sync form when active business changes
   useEffect(() => {
@@ -329,9 +351,22 @@ export default function SettingsPage() {
                             <Button size="sm" variant="ghost" className="text-xs h-7 text-destructive" onClick={() => handleDisconnect(plat.id)}>Disconnect</Button>
                           </>
                         ) : (
-                          <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => { setConnectingPlatform(plat.id); setPlatformToken(''); setPlatformAccountName(''); }}>
-                            Connect
-                          </Button>
+                          plat.id === 'facebook' ? (
+                            <Button
+                              size="sm"
+                              className="text-xs h-7 bg-blue-600 hover:bg-blue-700 text-white"
+                              onClick={() => {
+                                if (!activeBusiness) { toast.error('Select a business first'); return; }
+                                window.location.href = `/api/social/facebook/auth?businessId=${activeBusiness.id}`;
+                              }}
+                            >
+                              <Facebook className="h-3 w-3 mr-1" /> Sign in with Facebook
+                            </Button>
+                          ) : (
+                            <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => { setConnectingPlatform(plat.id); setPlatformToken(''); setPlatformAccountName(''); }}>
+                              Connect
+                            </Button>
+                          )
                         )}
                       </div>
                     </div>
