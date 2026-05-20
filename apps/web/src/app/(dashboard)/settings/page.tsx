@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Building2, Plus, Save, Globe, Instagram, Facebook, Twitter, Linkedin, Link2, CheckCircle2, XCircle } from 'lucide-react';
+import { Building2, Plus, Save, Globe, Instagram, Facebook, Twitter, Linkedin, Link2, CheckCircle2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Header } from '@/components/layout/header';
 import { Button } from '@/components/ui/button';
@@ -56,6 +56,49 @@ export default function SettingsPage() {
   const [platformToken, setPlatformToken] = useState('');
   const [platformAccountName, setPlatformAccountName] = useState('');
   const [savingPlatform, setSavingPlatform] = useState(false);
+  const [fbLoading, setFbLoading] = useState(false);
+
+  // Load Facebook JS SDK
+  useEffect(() => {
+    const appId = process.env.NEXT_PUBLIC_FACEBOOK_APP_ID;
+    if (!appId || (window as any).FB) return;
+    (window as any).fbAsyncInit = function () {
+      (window as any).FB.init({ appId, cookie: true, xfbml: false, version: 'v19.0' });
+    };
+    const script = document.createElement('script');
+    script.src = 'https://connect.facebook.net/en_US/sdk.js';
+    script.async = true;
+    document.body.appendChild(script);
+  }, []);
+
+  const handleFacebookLogin = useCallback(async () => {
+    if (!activeBusiness) { toast.error('Select a business first'); return; }
+    const FB = (window as any).FB;
+    if (!FB) { toast.error('Facebook SDK not loaded. Refresh and try again.'); return; }
+    setFbLoading(true);
+    FB.login(async (response: any) => {
+      if (response.authResponse?.accessToken) {
+        const userToken = response.authResponse.accessToken;
+        const res = await fetch('/api/social/facebook/pages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userToken, businessId: activeBusiness.id }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          toast.error(data.error ?? 'Failed to connect Facebook');
+        } else {
+          toast.success(`✅ Facebook Page connected: ${data.pageName}`);
+          const supabase = createClient();
+          const { data: accounts } = await supabase.from('connected_accounts').select('*').eq('business_id', activeBusiness.id);
+          setConnectedAccounts(accounts ?? []);
+        }
+      } else {
+        toast.error('Facebook login cancelled');
+      }
+      setFbLoading(false);
+    }, { scope: 'pages_show_list,pages_manage_posts,pages_read_engagement' });
+  }, [activeBusiness]);
 
   // Handle Facebook OAuth callback result
   useEffect(() => {
@@ -355,12 +398,13 @@ export default function SettingsPage() {
                             <Button
                               size="sm"
                               className="text-xs h-7 bg-blue-600 hover:bg-blue-700 text-white"
-                              onClick={() => {
-                                if (!activeBusiness) { toast.error('Select a business first'); return; }
-                                window.location.href = `/api/social/facebook/auth?businessId=${activeBusiness.id}`;
-                              }}
+                              onClick={handleFacebookLogin}
+                              disabled={fbLoading}
                             >
-                              <Facebook className="h-3 w-3 mr-1" /> Sign in with Facebook
+                              {fbLoading
+                                ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Connecting…</>
+                                : <><Facebook className="h-3 w-3 mr-1" />Sign in with Facebook</>
+                              }
                             </Button>
                           ) : (
                             <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => { setConnectingPlatform(plat.id); setPlatformToken(''); setPlatformAccountName(''); }}>
